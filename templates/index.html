@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Barcode Flasher</title>
+        <style>
+        body {
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: start;
+            min-height: 100vh;
+            background: #f0f0f0;
+        }
+        .container {
+            background: white;
+            padding: 20px 30px;
+            margin-top: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            width: 500px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+        }
+        label {
+            font-weight: bold;
+            display: block;
+            margin-top: 15px;
+        }
+        textarea {
+            width: 100%;
+            height: 100px;
+            font-family: monospace;
+            font-size: 1rem;
+            margin-top: 5px;
+            resize: vertical;
+        }
+        select, input[type="number"] {
+            margin-top: 5px;
+            font-size: 1rem;
+            padding: 4px 6px;
+        }
+        .error {
+            color: #b00020;
+            margin-top: 10px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 18px;
+            font-size: 1rem;
+            background: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #005bb5;
+        }
+
+        #volumeOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.75);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+      }
+      #volumeOverlayImg {
+        width: 90vw;
+        height: 90vh;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Barcode Flasher</h1>
+            <p>
+                Enter one or more barcodes (comma- or newline-separated), choose an ending character,
+                set the flash interval (ms ≥ 50), then click “Start Flash”.
+            </p>
+
+            {% if error %}
+            <div class="error">{{ error }}</div>
+            {% endif %}
+
+            <!--adjustable volume level-->            
+            <form method="post">
+                <label for="volume">Motorola Volume Level:</label>
+                <select name="volume" id="volume">
+                    <option value="">— Select Volume —</option>
+                    <option value="lowVolume">Low Volume</option>
+                    <option value="mediumVolume">Medium Volume</option>
+                    <option value="highVolume">High Volume</option>
+                    <option value="disableBeep">Disable Beep</option>
+                    <option value="enableBeep">Enable Beep</option>
+                </select>
+                <button type="button" id="showVolume">Show</button>
+            </form>
+
+            <div id="volumeOverlay" style="display: none;">
+                <img id="volumeOverlayImg" src="" alt="Volume barcode large" />
+            </div>
+
+            <form method="post">
+                <label for="barcodes">Barcodes:</label><br />
+                <textarea name="barcodes" id="barcodes" placeholder="e.g. 1234567, 7654321&#10;ABC123XYZ"></textarea>
+
+                <label for="ending">Ending character:</label>
+                <select name="ending" id="ending">
+                    <option value="None">None</option>
+                    <option value="CR">\r (Carriage Return)</option>
+                    <option value="LF">\n (Line Feed)</option>
+                    <option value="CR+LF">\r\n (CR + LF)</option>
+                </select>
+
+                <label for="interval">Flash interval (ms ≥ 50):</label>
+                <input type="number" name="interval" id="interval" value="500" min="50" step="10" />
+
+                <button type="submit">Start Flash</button>
+            </form>
+        </div>
+
+        <script>
+        // When the user clicks “Show” or changes the select, show the overlay.
+        const volumeSelect = document.getElementById("volume");
+        const showButton   = document.getElementById("showVolume");
+        const overlayDiv   = document.getElementById("volumeOverlay");
+        const overlayImg   = document.getElementById("volumeOverlayImg");
+
+        // Either respond to the “Show” button, or to select changes directly:
+        showButton.addEventListener("click", () => {
+            const lvl = volumeSelect.value;
+            if (lvl !== "") {
+                const url = `/static/${lvl}.png`;
+                overlayImg.src = url;
+                overlayDiv.style.display = "flex";
+            }
+        });
+
+        // Clicking anywhere on the overlay hides it again:
+        overlayDiv.addEventListener("click", () => {
+            overlayDiv.style.display = "none";
+        });
+        </script>
+    </body>
+</html>
