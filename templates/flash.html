@@ -67,6 +67,12 @@
         let intervalMs   = {{ interval_ms }};  // total time between the *start* of each flash
         const flashDur   = 400;                // ms to show each barcode
 
+        const preloadedImgs = flashList.map(entry => {
+            const img = new Image();
+            img.src   = entry.img_url;
+            return img;
+        });
+
         let idx = 0;
         const imgEl   = document.getElementById("barcode-img");
         const labelEl = document.getElementById("barcode-label");
