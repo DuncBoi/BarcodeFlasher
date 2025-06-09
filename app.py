@@ -52,38 +52,41 @@ def barcode_png():
 @app.route("/", methods=["GET", "POST"])
 def form():
     if request.method == "POST":
-        # grab barcode values from the submitted form
-        raw = request.form.get("barcodes", "").strip()
-        if not raw:
+        # 1) Retrieve all barcode entries and their endings
+        codes = request.form.getlist("barcodes[]")
+        ends  = request.form.getlist("endings[]")
+
+        term_map = {
+            "None": "",
+            "LF":    "\n",
+            "CR":    "\r",
+            "FF":    "\f"
+        }
+
+        # 2) Pair up and filter out empty codes
+        pairs = [
+            (code.strip(), term_map.get(ending, ""))
+            for code, ending in zip(codes, ends)
+            if code.strip()
+        ]
+        if not pairs:
             return render_template("index.html", error="Enter at least one barcode.")
 
-        # splits into different barcodes based on newline or comma
-        chunks = raw.replace(",", "\n").splitlines()
-        # clean up each line and filter out nulls
-        barcodes = [c.strip() for c in chunks if c.strip()]
-        if not barcodes:
-            return render_template("index.html", error="No valid barcodes found.")
-
-        # grab the chosen endbyte from the form
-        ending_choice = request.form.get("ending", "None")
-        # map the ending byte form names to their actual byte values
-        term_map = {"None": "", "CR": "\r", "LF": "\n", "CR+LF": "\r\n"}
-        endByte = term_map.get(ending_choice, "")
-
+        # 3) Validate the interval
         try:
-            # grab the interval value from the form
             interval_ms = int(request.form.get("interval", "500"))
             if interval_ms < 50:
                 raise ValueError
         except ValueError:
             return render_template("index.html", error="Interval must be integer ≥ 50.")
 
-        # create new list with codes + endByte
+        # 4) Build the flash_list
+        from urllib.parse import quote
         flash_list = []
-        for b in barcodes:
-            display_label = b + endByte
-            url = f"/barcode.png?code={b}&type=code128"
-            # create json list
+        for code, ending in pairs:
+            display_label = code + ending
+            safe_code     = quote(code, safe="")
+            url           = f"/barcode.png?code={safe_code}&type=code128"
             flash_list.append({"label": display_label, "img_url": url})
 
         return render_template(
@@ -92,6 +95,7 @@ def form():
             interval_ms=interval_ms
         )
 
+    # GET falls through here
     return render_template("index.html")
 
 if __name__ == "__main__":

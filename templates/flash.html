@@ -42,15 +42,24 @@
         }
         #stop-btn:hover {
             background: #a00;
+        }    
+
+        #container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
         </style>
     </head>
     <body>
         <button id="stop-btn" onclick="window.location='/'">⏹ Stop</button>
 
-        <img id="barcode-img" src="" alt="Barcode will appear here" />
+        <div id="container">
+            <img id="barcode-img" src="" alt="Barcode will appear here" />
 
-        <div id="barcode-label"></div>
+            <div id="barcode-label"></div>
+        </div>
 
         <script>
         // retrieve flashlist from app.py
@@ -63,13 +72,33 @@
 
         function showNext() {
             const entry = flashList[idx];
-            imgEl.src = entry.img_url;
-            labelEl.textContent = entry.label;
+            imgEl.src    = entry.img_url;
 
-            idx = (idx + 1) % flashList.length;
-            setTimeout(showNext, intervalMs);
+            // 1) Pull off exactly one ending byte (if any)
+            let raw    = entry.label;
+            let visEnd = "";
+            if (raw.length > 0) {
+                const code = raw.charCodeAt(raw.length - 1);
+                if (code === 10 || code === 13 || code === 12) {
+                    const map = { 10: "\\n", 13: "\\r", 12: "\\f" };
+                    visEnd = map[code];
+                    raw    = raw.slice(0, -1);
+                }
+            }
+
+            // 2) Render
+            if (visEnd) {
+                labelEl.innerHTML = `${raw}<span>${visEnd}</span>`;
+            } else {
+                labelEl.textContent = raw;
+            }
+
+            // 3) Advance or stop
+            idx++;
+            if (idx < flashList.length) {
+                setTimeout(showNext, intervalMs);
+            }
         }
-
         window.onload = () => {
             showNext();
         };

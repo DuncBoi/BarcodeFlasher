@@ -20,7 +20,7 @@
             margin-top: 40px;
             border-radius: 8px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.15);
-            width: 500px;
+            width: 90vw;
         }
         h1 {
             font-size: 1.5rem;
@@ -63,31 +63,59 @@
         }
 
         #volumeOverlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.75);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-      }
-      #volumeOverlayImg {
-        width: 90vw;
-        height: 90vh;
-        background: white;
-        border-radius: 8px;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-      }
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.75);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+        }
+        #volumeOverlayImg {
+            width: 15vw;
+            height: 15vh;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        #fastOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.75);
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        .barcode-row {
+            display: flex;
+            align-items: center;
+            margin-top: 8px;
+        }
+        .barcode-row input[type="text"] {
+            flex: 1;
+            padding: 4px 6px;
+            margin-right: 8px;
+        }
+        .barcode-row select {
+            margin-right: 8px;
+        }
+        .barcode-row button.remove {
+            background: #c00;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
         </style>
     </head>
     <body>
         <div class="container">
             <h1>Barcode Flasher</h1>
             <p>
-                Enter one or more barcodes (comma- or newline-separated), choose an ending character,
+                Enter one or more barcodes, choose an ending character,
                 set the flash interval (ms ≥ 50), then click “Start Flash”.
             </p>
 
@@ -109,37 +137,130 @@
                 <button type="button" id="showVolume">Show</button>
             </form>
 
+            <p>
+                For faster scanning:
+            </p>
+            <ul>
+                <li>
+                    <strong>Fast Mode:</strong> Scan this sequence to match your chosen flash interval.
+                </li>
+                <li>
+                    <strong>Insanely Fast Mode:</strong> Scan this sequence to eliminate all delays between identical barcode reads.
+                    <br>
+                    <strong><em>Note:</em></strong> The “0” barcode appears twice in this sequence and must be scanned twice.<br>
+                    <strong><em>Note:</em></strong> All fast mode settings must be scanned first for insanely fast mode to work
+                </li>
+            </ul>
+
+            <form>
+                <button type="button" id="fastMode">Fast Mode</button>
+            </form>
+
+            <form>
+                <button type="button" id="insaneMode">Insanely Fast Mode</button>
+            </form>
+
+            <form>
+                <button type="button" id="resetDefaults">Reset Scanner to Default Settings</button>
+            </form>
+
+            <div id="fastOverlay">
+                <button id="fastPrev" style="position:absolute; left:10px;">◀</button>
+                <img id="fastOverlayImg" src="" alt="Fast-Mode Barcode" 
+                    style="width:15vw; max-height:15vh;"/>
+                <button id="fastNext" style="position:absolute; right:10px;">▶</button>
+            </div>
+
             <div id="volumeOverlay" style="display: none;">
                 <img id="volumeOverlayImg" src="" alt="Volume barcode large" />
             </div>
 
-            <form method="post">
-                <label for="barcodes">Barcodes:</label><br />
-                <textarea name="barcodes" id="barcodes" placeholder="e.g. 1234567, 7654321&#10;ABC123XYZ"></textarea>
+            <form method="post" id="flashForm">
+                <label>Barcodes + endings:</label>
+                <p>Endings: \n - BARCODEREADER_DATA_END1, \r - BARCODEREADER_DATA_END2, \f - BARCODEREADER_DATA_END3</p>
+                <div id="barcodeList">
+                    <!-- rows will go here -->
+                </div>
+                <button type="button" id="addBarcode" style="margin-top:10px;">
+                    + Add Barcode
+                </button>
 
-                <label for="ending">Ending character:</label>
-                <select name="ending" id="ending">
-                    <option value="None">None</option>
-                    <option value="CR">\r (Carriage Return)</option>
-                    <option value="LF">\n (Line Feed)</option>
-                    <option value="CR+LF">\r\n (CR + LF)</option>
-                </select>
-
-                <label for="interval">Flash interval (ms ≥ 50):</label>
-                <input type="number" name="interval" id="interval" value="500" min="50" step="10" />
-
-                <button type="submit">Start Flash</button>
+                <button type="submit" style="margin-top:20px;">
+                    Start Flash
+                </button>
             </form>
         </div>
 
+
         <script>
-        // When the user clicks “Show” or changes the select, show the overlay.
+        const listDiv    = document.getElementById("barcodeList");
+        const addBtn     = document.getElementById("addBarcode");
+
+        // 1) A factory to create one row
+        function makeRow(value="", ending="None") {
+            const row = document.createElement("div");
+            row.className = "barcode-row";
+
+            // barcode text input
+            const input = document.createElement("input");
+            input.type  = "text";
+            input.name  = "barcodes[]";
+            input.value = value;
+            input.placeholder = "e.g. 1234567";
+
+            const select = document.createElement("select");
+            select.name = "endings[]";
+
+            const endings = [
+                { value: "None",                text: "None"                    },
+                { value: "LF",                  text: "Line Feed (\\n)"        },
+                { value: "CR",                  text: "Carriage Return (\\r)"  },
+                { value: "FF",                  text: "Form Feed (\\f)"        },
+            ];
+
+            endings.forEach(end => {
+                const o = document.createElement("option");
+                o.value       = end.value;
+                o.textContent = end.text;
+                if (end.value === ending) o.selected = true;
+                select.appendChild(o);
+            });
+
+            // remove button
+            const rem = document.createElement("button");
+            rem.type      = "button";
+            rem.textContent = "Remove";
+            rem.className = "remove";
+            rem.addEventListener("click", () => row.remove());
+
+            row.append(input, select, rem);
+            return row;
+        }
+
+        // 2) Add-handler
+        addBtn.addEventListener("click", () => {
+            listDiv.appendChild(makeRow());
+        });
+
+        // 3) Seed one row on page load
+        listDiv.appendChild(makeRow());
+
+        // 4) On form submit, optional: validate / serialize
+        document.getElementById("flashForm").addEventListener("submit", e => {
+            const inputs = listDiv.querySelectorAll("input[name='barcodes[]']");
+            for (let inp of inputs) {
+                if (!inp.value.trim()) {
+                    e.preventDefault();
+                    alert("Please fill in all barcode fields or remove empty ones.");
+                    return;
+                }
+            }
+        });
         const volumeSelect = document.getElementById("volume");
         const showButton   = document.getElementById("showVolume");
         const overlayDiv   = document.getElementById("volumeOverlay");
         const overlayImg   = document.getElementById("volumeOverlayImg");
 
-        // Either respond to the “Show” button, or to select changes directly:
         showButton.addEventListener("click", () => {
             const lvl = volumeSelect.value;
             if (lvl !== "") {
@@ -152,6 +273,73 @@
         // Clicking anywhere on the overlay hides it again:
         overlayDiv.addEventListener("click", () => {
             overlayDiv.style.display = "none";
+        });
+
+
+        const fastModeBtn    = document.getElementById("fastMode");
+        const insaneModeBtn = document.getElementById("insaneMode");
+        const resetBtn       = document.getElementById("resetDefaults");
+        const overlay    = document.getElementById("fastOverlay");
+        const imgEl        = document.getElementById("fastOverlayImg");
+        const prevBtn    = document.getElementById("fastPrev");
+        const nextBtn    = document.getElementById("fastNext");
+
+        const fastBarcodes = [
+            "/static/illumination.png",
+            "/static/enablePresentation.png",
+        ];
+        const insaneBarcodes = [ 
+            "/static/timeoutBetweenDecodes.png", 
+            "/static/0.png",
+            "/static/0.png",
+            "/static/smallFOV.png"
+        ];
+
+        let currentList = fastBarcodes;
+        let idx = 0;
+
+        function showIdx() {
+            imgEl.src = currentList[idx];
+        }
+
+        fastModeBtn.addEventListener("click", () => {
+            currentList = fastBarcodes;
+            idx = 0;
+            showIdx();
+            overlay.style.display = "flex";
+        });
+
+        insaneModeBtn.addEventListener("click", () => {
+            currentList = insaneBarcodes;
+            idx = 0;
+            showIdx();
+            overlay.style.display = "flex";
+        });
+
+        resetBtn.addEventListener("click", () => {
+            overlayImg.src = "/static/defaults.png";
+            overlayDiv.style.display = "flex";
+        });
+
+        // arrows
+        prevBtn.addEventListener("click", () => {
+            if (idx > 0){
+                idx--;
+                showIdx();
+            }
+        });
+        nextBtn.addEventListener("click", () => {
+            if (idx < currentList.length - 1) {
+                idx++;
+                showIdx();
+            } else {
+                overlay.style.display = "none";
+            }
+        });
+
+        // click outside to close
+        overlay.addEventListener("click", e => {
+            if (e.target === overlay) overlay.style.display = "none";
         });
         </script>
     </body>
