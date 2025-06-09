@@ -75,8 +75,8 @@
             z-index: 9999;
         }
         #volumeOverlayImg {
-            width: 15vw;
-            height: 15vh;
+            width: 18vw;
+            height: 18vh;
             background: white;
             border-radius: 8px;
             box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
@@ -167,7 +167,7 @@
             <div id="fastOverlay">
                 <button id="fastPrev" style="position:absolute; left:10px;">◀</button>
                 <img id="fastOverlayImg" src="" alt="Fast-Mode Barcode" 
-                    style="width:15vw; max-height:15vh;"/>
+                    style="width:18vw; max-height:18vh;"/>
                 <button id="fastNext" style="position:absolute; right:10px;">▶</button>
             </div>
 
@@ -184,6 +184,21 @@
                 <button type="button" id="addBarcode" style="margin-top:10px;">
                     + Add Barcode
                 </button>
+
+                <button type="button" id="clearForm" style="margin-top:10px; margin-left:8px;">
+                    ✖ Clear Form
+                </button>
+
+                <label for="interval">Flash interval (ms ≥ 50):</label>
+                <input
+                    type="number"
+                    name="interval"
+                    id="interval"
+                    value="500"
+                    min="50"
+                    step="10"
+                    style="margin-top:5px;"
+                />
 
                 <button type="submit" style="margin-top:20px;">
                     Start Flash
@@ -340,6 +355,43 @@
         // click outside to close
         overlay.addEventListener("click", e => {
             if (e.target === overlay) overlay.style.display = "none";
+        });
+
+        // --- 1) On load, repopulate from localStorage ---
+        window.addEventListener("DOMContentLoaded", () => {
+            const saved = JSON.parse(localStorage.getItem("flashForm")) || {};
+            if (saved.volume)      document.getElementById("volume").value = saved.volume;
+            if (saved.interval)    document.getElementById("interval").value = saved.interval;
+
+            // clear existing rows & re‐add
+            const listDiv = document.getElementById("barcodeList");
+            listDiv.innerHTML = "";
+            (saved.rows || []).forEach(({code, ending}) => {
+                listDiv.appendChild(makeRow(code, ending));
+            });
+        });
+
+        // --- 2) Before navigating away on submit, save form state ---
+        document.getElementById("flashForm").addEventListener("submit", () => {
+            const volume   = document.getElementById("volume").value;
+            const interval = document.getElementById("interval").value;
+            const rows = Array.from(document.querySelectorAll(".barcode-row")).map(row => {
+                return {
+                    code:   row.querySelector("input[name='barcodes[]']").value,
+                    ending: row.querySelector("select[name='endings[]']").value
+                };
+            });
+            localStorage.setItem("flashForm", JSON.stringify({ volume, interval, rows }));
+        });
+
+        document.getElementById("clearForm").addEventListener("click", () => {
+            localStorage.removeItem("flashForm");
+            document.getElementById("volume").value   = "";
+            document.getElementById("interval").value = 500;
+            const listDiv = document.getElementById("barcodeList");
+            listDiv.innerHTML = "";
+            listDiv.appendChild(makeRow());
+            listDiv.querySelector("input[name='barcodes[]']").focus();
         });
         </script>
     </body>

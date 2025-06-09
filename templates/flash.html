@@ -62,22 +62,24 @@
         </div>
 
         <script>
-        // retrieve flashlist from app.py
-        const flashList = {{ flash_list|tojson }};
-        const intervalMs = {{ interval_ms }};
+        // retrieve flashList & intervalMs from Flask
+        const flashList  = {{ flash_list|tojson }};
+        let intervalMs   = {{ interval_ms }};  // total time between the *start* of each flash
+        const flashDur   = 400;                // ms to show each barcode
 
         let idx = 0;
-        const imgEl = document.getElementById("barcode-img");
+        const imgEl   = document.getElementById("barcode-img");
         const labelEl = document.getElementById("barcode-label");
 
-        function showNext() {
+        function showFlash() {
+            // 1) Display the barcode + ending
             const entry = flashList[idx];
-            imgEl.src    = entry.img_url;
+            imgEl.src   = entry.img_url;
 
-            // 1) Pull off exactly one ending byte (if any)
+            // split off ending byte for display
             let raw    = entry.label;
             let visEnd = "";
-            if (raw.length > 0) {
+            if (raw.length) {
                 const code = raw.charCodeAt(raw.length - 1);
                 if (code === 10 || code === 13 || code === 12) {
                     const map = { 10: "\\n", 13: "\\r", 12: "\\f" };
@@ -85,23 +87,43 @@
                     raw    = raw.slice(0, -1);
                 }
             }
-
-            // 2) Render
             if (visEnd) {
-                labelEl.innerHTML = `${raw}<span>${visEnd}</span>`;
+                labelEl.innerHTML = `${raw}<span style="color:#0f0">${visEnd}</span>`;
             } else {
                 labelEl.textContent = raw;
             }
 
-            // 3) Advance or stop
-            idx++;
-            if (idx < flashList.length) {
-                setTimeout(showNext, intervalMs);
-            }
+            // 2) After flashDur, clear and start countdown
+            setTimeout(clearAndCountdown, flashDur);
         }
-        window.onload = () => {
-            showNext();
-        };
+
+        function clearAndCountdown() {
+            // clear image
+            imgEl.src = "";
+            // compute how long until next flash should begin
+            let wait = Math.max(intervalMs - flashDur, 0);
+
+            // show a simple seconds countdown
+            const start = Date.now();
+            labelEl.textContent = (wait/1000).toFixed(1) + " s";
+
+            const ticker = setInterval(() => {
+                let elapsed = Date.now() - start;
+                let rem = wait - elapsed;
+                if (rem > 0) {
+                    labelEl.textContent = (rem/1000).toFixed(1) + " s";
+                } else {
+                    clearInterval(ticker);
+                }
+            }, 100);
+
+            // advance index, schedule next flash
+            idx = (idx + 1) % flashList.length;
+            setTimeout(showFlash, wait);
+        }
+
+        // kick it off on load
+        window.onload = showFlash;
         </script>
     </body>
 </html>
