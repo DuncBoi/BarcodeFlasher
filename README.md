@@ -46,7 +46,7 @@ barcode-flasher/
 ## Prerequisites
 
 - **Python 3.8+**
-- **pip** (packaged with Python)  
+- **pip**
 - A POSIX-style shell
 
 
