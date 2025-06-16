@@ -1,6 +1,6 @@
 # Barcode Flasher
 
-A compact Flask-based web app that queues custom barcode sequences and displays them on screen at precise intervals. Ideal for rigorous stress-testing and validation of any software or hardware workflow that consumes live scanner input.
+A Flask web app that queues custom barcode sequences and displays them on screen at precise intervals. Ideal for stress-testing and validation of any workflow that consumes live scanner input.
 
 ---
 
