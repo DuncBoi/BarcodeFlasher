@@ -1,8 +1,9 @@
 # Barcode Flasher
 
-A small Flask-based web app that lets you enter one or more barcodes (with optional line-feed, carriage-return, or form-feed endings), choose a flash interval, and then “flash” them fullscreen one at a time. Includes “fast” and “insanely fast” scan-sequence modes and adjustable Motorola scanner volume presets.
+A compact Flask-based web app that queues custom barcode sequences and displays them on screen at precise intervals. Ideal for rigorous stress-testing and validation of any software or hardware workflow that consumes live scanner input.
 
 ---
+
 ## Table of Contents
 
 1. [Directory Structure](#directory-structure)  
@@ -11,7 +12,8 @@ A small Flask-based web app that lets you enter one or more barcodes (with optio
 4. [Settings](#settings)  
 5. [Adding Barcodes & Flash Sequence](#adding-barcodes--flash-sequence)  
 6. [Configuration](#configuration)  
-7. [Code Walkthrough](#code-walkthrough)  
+7. [Server (app.py)](#server-apppy)  
+8. [Barcodes Not Scanning?](#barcodes-not-scanning)  
 
 ---
 
@@ -106,26 +108,26 @@ barcode-flasher/
 Before making any changes, click **Reset Scanner to Default Settings**. The scanner will flash the `defaults.png` barcode. Scan this with the barcode reader to revert to factory parameters.
 
 Scan one of the following barcodes to adjust the beep volume based on your preferences
-- **Low Volume**: quiet beep, ideal for noise-sensitive environments.  
-- **Medium Volume**: balanced feedback for general use.  
-- **High Volume**: loud beep to confirm scans in loud areas.  
-- **Disable Beep**: turns off all audio feedback.  
-- **Enable Beep**: restores the beep after it has been disabled.  
+- *Low Volume*: quiet beep, ideal for noise-sensitive environments.  
+- *Medium Volume*: balanced feedback for general use.  
+- *High Volume*: loud beep to confirm scans in loud areas.  
+- *Disable Beep*: turns off all audio feedback.  
+- *Enable Beep*: restores the beep after it has been disabled.  
 
 **3. Fast Mode (Recommended for All Testing)**  
 Scan these in order:  
-1. **Illumination Always On** (`illumination.png`)  
+1. *Illumination Always On* (`illumination.png`)  
    - Keeps the aimer LED and illumination lamp active at all times, eliminating warm-up delays and improving screen scan performance.  
-2. **Presentation Mode** (`enablePresentation.png`)  
+2. *Presentation Mode* (`enablePresentation.png`)  
    - Projects a red aimer dot for precise on-screen targeting.  
 
 **4. Insanely Fast Mode**  
 Only use this if you want to really stress test the functionality.  
 *Fast Mode must be scanned before Insanely Fast Mode will work.* Once Fast Mode is enabled, scan these in sequence to remove all inter-scan delays and reduce processing overhead:  
-1. **Timeout Between Decodes, Same Symbol** (`timeoutBetweenDecodes.png`)  
-2. **“0” Barcode** (`0.png`) – scan twice (it appears twice in the sequence).  
+1. *Timeout Between Decodes, Same Symbol* (`timeoutBetweenDecodes.png`)  
+2. *“0” Barcode* (`0.png`) – scan twice (it appears twice in the sequence).  
    - Sets the scanner’s internal delay between identical barcode scans to 0 ms (default is 400 ms).    
-3. **Small Field of View** (`smallFOV.png`)  
+3. *Small Field of View* (`smallFOV.png`)  
    - Narrows the sensor’s active area, reducing processing time per scan.
 
 ---
@@ -136,14 +138,14 @@ On the **Index** page you can build an arbitrary sequence of barcodes, each with
 
 ### 1. Building your sequence
 
-1. **Add a row**: click **+ Add Barcode** to append a new input row.  
-2. **Enter your code**: in the text box, type the exact barcode data (e.g. `1234567`).  
-3. **Select an ending**: choose one of:
+1. *Add a row*: click **+ Add Barcode** to append a new input row.  
+2. *Enter your code**: in the text box, type the exact barcode data (e.g. `1234567`).  
+3. *Select an ending*: choose one of:
    - **None** — no extra byte  
    - **Line Feed (\\n)** — appends ASCII 10  
    - **Carriage Return (\\r)** — appends ASCII 13  
    - **Form Feed (\\f)** — appends ASCII 12  
-4. **Remove if needed**: click **Remove** on any row to delete it.  
+4. *Remove if needed*: click **Remove** on any row to delete it.  
 
 > empty barcode fields are disallowed — you’ll get an alert if you try to submit with blank rows.
 
@@ -160,46 +162,71 @@ On the **Index** page you can build an arbitrary sequence of barcodes, each with
 
 ---
 
-## Code Walkthrough
+## Server (app.py)
 
-### app.py
+- **GET /**  
+  Renders `index.html`.
 
-1. Imports & Setup  
-- Flask, request, send_file, abort, render_template  
-- barcode + ImageWriter for PNGs  
-- io.BytesIO() for buffer  
-- app = Flask(__name__)
+- **POST /**  
+  - Reads `barcodes[]` and `endings[]`.  
+  - Maps endings (`None`, `LF`, `CR`, `FF`) to literal control characters.  
+  - Filters out empty barcode entries.  
+  - Validates `interval ≥ 50 ms`.  
+  - Builds `flash_list` of `{ label, img_url }` entries, URL-encoding each code.  
+  - Renders `flash.html` with the resulting lists.
 
-2. /barcode.png  
-- Reads code & type params  
-- Validates code, maps type via BARCLASSES  
-- Generates barcode PNG into buffer and returns with send_file  
-- Error handling returns 400 or 500 on failure
+- **GET /barcode.png**  
+  - Accepts `?code=` and optional `?type=` (default `code128`).  
+  - Chooses from `code128`, `ean13`, `ean8`, `upca` classes.  
+  - Writes the barcode to memory with custom `module_width`/`module_height`.  
+  - Returns raw PNG or a `400`/`500` error with a helpful message
 
-3. /  
-- GET: renders index.html  
-- POST:  
-  - Retrieves barcodes[] & endings[], maps control chars, filters empties  
-  - Validates at least one pair and interval_ms ≥ 50  
-  - Builds flash_list of {label,img_url}  
-  - Renders flash.html with context
 
-### templates/index.html
+## Barcodes Not Scanning?
 
-- Dynamic barcode rows via makeRow()  
-- Form with volume select, interval input, buttons (Add, Clear, Fast, Insane, Reset, Start Flash)  
-- Overlays for volume and fast modes  
-- JS handles row management, validation, localStorage persistence, and overlays
+If barcodes are too small or too large on screen, the scanner may fail to read them reliably.
 
-### templates/flash.html
+### Modifying Dimensions of the Server-Generated Barcodes
 
-- Preloads flash_list images  
-- showFlash(): displays each barcode + label for 400 ms  
-- clearAndCountdown(): clears image, shows countdown, then schedules next showFlash()  
-- Loops through flash_list; Stop button returns to index
+In **app.py**, locate the `bc.write(buf, options)` call:
 
-### static/
+```python
+bc.write(buf, {"module_width": 0.2, "module_height": 15.0})
+```
 
-- Contains all PNG assets for volume presets, fast/insane modes, defaults; filenames must match above
+- **`module_width`** controls the width of each barcode bar (in mm). Increasing this makes the barcode wider.  
+- **`module_height`** controls the height of the bars (in mm). Increasing this makes the barcode taller.
+
+**Optional:** you can also tweak writer options like `font_size`, `text_distance`, and `quiet_zone`:
+
+```python
+bc.write(buf, {
+    "module_width": 0.3,
+    "module_height": 25.0,
+    "font_size": 10,
+    "text_distance": 1.0,
+    "quiet_zone": 6.5
+})
+```
+
+### Modifying Dimensions of the Settings Barcodes (Volume, Fast Mode, etc.)
+
+In `index.html` find the following snippets and modify the width and height to your liking:
+
+```html
+<style>
+  /* make volume preset bigger */
+  #volumeOverlayImg {
+    width: 30vw;
+    height: 30vh;
+  }
+
+  /* make fast/insane mode images bigger */
+  #fastOverlayImg {
+    width: 25vw;
+    max-height: 25vh;
+  }
+</style>
+```
 
 
